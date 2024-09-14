@@ -1,5 +1,3 @@
-#include "Arduino.h"
-
 constexpr byte SONAR_TRIGGER{7};
 constexpr byte SONAR_ECHO{8};
 

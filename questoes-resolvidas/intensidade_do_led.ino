@@ -1,5 +1,3 @@
-#include "Arduino.h"
-
 constexpr int IN_POT{A0};
 constexpr int OUT_LED{11}; // NOTE: PWM
 

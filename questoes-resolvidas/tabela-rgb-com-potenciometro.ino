@@ -1,8 +1,5 @@
 // Contamos, de forma limitada,de 000 até 111 e traduzimos isso em forma de uma tabela RGB,
 // onde R = MSB e B = LSB. O código abaixo nos permite percorrer essa tabela com o pot 10k
-
-#include "Arduino.h"
-
 constexpr int IN_POT{A0};
 
 constexpr int OUT_LED_R{9};

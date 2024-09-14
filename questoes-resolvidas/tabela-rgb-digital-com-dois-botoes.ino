@@ -1,7 +1,3 @@
-// Esse exemplo é semelhante ao anterior, porém agora com 1 botão para top-down e outro para bottom-up
-
-#include "Arduino.h"
-
 constexpr byte OUT_LED_R{9};
 constexpr byte OUT_LED_G{10};
 constexpr byte OUT_LED_B{11};

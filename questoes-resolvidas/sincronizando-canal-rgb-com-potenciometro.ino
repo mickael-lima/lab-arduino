@@ -1,5 +1,3 @@
-#include "Arduino.h"
-
 constexpr byte IN_POT_R{A0};
 constexpr byte IN_POT_G{A1};
 constexpr byte IN_POT_B{A2};

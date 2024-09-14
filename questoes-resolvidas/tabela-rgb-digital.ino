@@ -1,7 +1,4 @@
 // Conta de 000 até 111 e utiliza os bits como saída para um LED RGB
-
-#include "Arduino.h"
-
 constexpr int OUT_LED_R{9};
 constexpr int OUT_LED_G{10};
 constexpr int OUT_LED_B{11};
