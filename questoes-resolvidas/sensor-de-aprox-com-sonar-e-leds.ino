@@ -6,7 +6,10 @@ constexpr byte SONAR_ECHO{8};
 constexpr float V_DO_SOM{0.01715};
 
 constexpr byte LED[3] = {9, 10, 11};
-constexpr byte LED_ARR_SIZE{sizeof(LED)/sizeof(byte)};
+
+// NOTE: O -1 servirá para computarmos o complemento dentro do for loop e, com isso, inverter a ordem dos LEDs que serão acesos 
+// sem modificar a lógica das funções já existentes
+constexpr byte LED_ARR_SIZE{sizeof(LED)/sizeof(byte) - 1};
 
 // O Sonar age enviando um pulso de som e contabilizando o tempo que ele demora pra voltar até o sensor (semelhante a um morcego)
 // portanto precisa de duas portas: uma para emitir o som e outra para recebe-lo de volta
@@ -53,8 +56,8 @@ bool in_interval(T value, U a, U b) {
 }
 
 void write_to_led(byte number) {
-  for(auto i = 0; i < LED_ARR_SIZE; i++)
-    digitalWrite(LED[i], (number >> i) & 0b001);
+  for(auto i = 0; i <= LED_ARR_SIZE; i++)
+    digitalWrite(LED[i], (number >> (LED_ARR_SIZE - i)) & 0b1); // NOTE: Complemento aplicado aqui
 }
 
 void loop() {
@@ -63,18 +66,18 @@ void loop() {
   // NOTE: caso a distância não precise ser em float, pode-se refatorar usando switch case
   // Se a distância estiver entre 100 e 150 cm
   if(in_interval(actual_distance, 100, 150))
-    write_to_led(1); // equivale a {0, 0 ,1}
+    write_to_led(0b100); // equivale a {1, 0 ,0}
 
   // Se a distância estiver entre 50 e 100 cm
   else if(in_interval(actual_distance, 50, 100))
-    write_to_led(3); // equivale a {0, 1, 1}
+    write_to_led(0b110); // equivale a {1, 1, 0}
 
   // Se a distância estiver entre 50 e 100cm
   else if(in_interval(actual_distance, 0, 50)) {
-    write_to_led(7); // equivale a {1, 1, 1}
+    write_to_led(0b111); // equivale a {1, 1, 1}
     delay(actual_distance * 20); // para implementar o efeito de luzes piscando proporcional a distância
 
-    write_to_led(0);
+    write_to_led(0b110);
     delay(actual_distance * 20);
   }
 
