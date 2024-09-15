@@ -5,7 +5,7 @@ constexpr byte SONAR_ECHO{8};
 // é interessante fazê-lo logo na constante para poupar processamento. A velocidade do som em cm/µs é 0.343
 constexpr float V_DO_SOM{0.01715};
 
-constexpr byte LED[3] = {9, 10, 11};
+constexpr byte LED[] = {9, 10, 11};
 
 // NOTE: O -1 servirá para computarmos o complemento dentro do for loop e, com isso, inverter a ordem dos LEDs que serão acesos 
 // sem modificar a lógica das funções já existentes
@@ -82,6 +82,5 @@ void loop() {
   }
 
   else
-    write_to_led(0);
-
+    write_to_led(0b000);
 }

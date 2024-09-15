@@ -1,5 +1,3 @@
-#include "Arduino.h"
-
 constexpr byte SONAR_TRIGGER{13};
 constexpr byte SONAR_ECHO{12};
 
@@ -71,5 +69,4 @@ void loop() {
 
   else
     write_to_led(0b000000000);
-
 }
