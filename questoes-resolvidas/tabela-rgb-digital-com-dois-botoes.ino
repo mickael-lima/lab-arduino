@@ -1,118 +1,94 @@
-constexpr byte OUT_LED_R{9};
-constexpr byte OUT_LED_G{10};
-constexpr byte OUT_LED_B{11};
+const byte RGB_PIN[] = {9, 10, 11}; // NOTE: PWM
 
-constexpr byte IN_BUTTON_DN{7};
-constexpr byte IN_BUTTON_UP{8};
-
-struct Color {
-    byte R;
-    byte G;
-    byte B;
+// Tabela para testes
+const byte T_RGB[][15] = {{0, 0, 0}, // Desligado
+                         {0, 0, 255}, // Azul
+                         {0, 255, 0}, // Verde
+                         {0, 255, 255}, // Ciano
+                         {255, 0, 0}, // Vermelho
+                         {255, 0, 255}, // Magenta
+                         {255, 255, 0}, // Amarelo
+                         {85, 85, 85}, // Branco
+                         {127, 0, 127}, // Roxo
+                         {0, 127, 127}, // Verde Azulado
+                         {127, 127, 0}, // Laranja
+                         {190, 190, 190}, // Cinza
+                         {210, 105, 30}, // Chocolate
+                         {238, 130, 238}, // Violeta
+                         {165, 42, 42}, // Marrom
 };
 
-Color actual_color;
+// Número de elementos na tabela e número de elementos dos elementos da tabela, respectivamente
+// NOTE: Isso considera que todos os elementos internos do vetor T_RGB tem o mesmo número de
+// componentes
+const byte T_LEN = sizeof(T_RGB)/sizeof(T_RGB[0]);
+const byte VEC_LEN = 3;
 
-struct ButtonStatus {
-    bool up_status{false};
-    bool down_status{false};
+// NOTE: problema de design em relação ao pino do botão não ser constante, podendo mudar
+// durante o runtime
+struct Button {
+  Button(byte pin) : pin{pin} {}
+
+  byte pin{};
+  bool current_state = LOW;
+  bool last_state = LOW;
+  bool was_pressed = false;
 };
 
-ButtonStatus btn_last_status;
-
-// Lista de cores usados para tabela RGB
-constexpr long int TABELA_RGB[] = {0x000000, // Desligado
-                              0x0000ff, // Azul
-                              0x00ff00, // Verde
-                              0x00ffff, // Ciano
-                              0xff0000, // Vermelho
-                              0xff00ff, // Magenta
-                              0xffff00, // Amarelo
-                              0x555555, // Branco
-                              0x7F007F, // Roxo
-                              0x007F7F, // Verde Azulado
-                              0x7F7F00, // Laranja
-                              0xBEBEBE, // Cinza
-                              0xD2691E, // Chocolate
-                              0xEE82EE, // Violeta
-                              0xA52A2A}; // Marrom
-
-constexpr byte TABELA_LEN{sizeof(TABELA_RGB)/sizeof(const long int)};
+// Botão para descer e subir a tabela
+Button b_down{3};
+Button b_up{4};
 
 void setup() {
-    pinMode(OUT_LED_R, OUTPUT);
-    pinMode(OUT_LED_G, OUTPUT);
-    pinMode(OUT_LED_B, OUTPUT);
+  for(auto PIN : RGB_PIN)
+    pinMode(PIN, OUTPUT);
 
-    pinMode(IN_BUTTON_DN, INPUT);
-    pinMode(IN_BUTTON_UP, INPUT);
+  // É possível configurar N botões com um for-loop de uma array de objetos Button
+  pinMode(b_down.pin, INPUT);
+  pinMode(b_up.pin, INPUT);
 
-    Serial.begin(13000);
+  Serial.begin(9600);
 }
 
-// OBS: o tinkercad precisa da keyword struct explicita para reconhecer que essa estrutura é um tipo válido
-// de dados criado pelo usuário, talvez seja bug do tinkercad ou uma regra geral especificamente para arduino
-void number_to_RGB(long int number, Color &color_buffer) {
-    color_buffer.R = number >> 16;
-    color_buffer.G = number >> 8;
-    color_buffer.B = number >> 0;
+void statusButton(struct Button &btn) {
+  auto current_input = digitalRead(btn.pin);
 
+  if(current_input == HIGH) {
+    delay(5);
+    current_input = digitalRead(btn.pin);
+  }
+
+  btn.current_state = current_input;
+  btn.was_pressed = (btn.last_state == LOW && btn.current_state == HIGH) ? true : false;
 }
 
-void write_color_to_led(Color &color) {
-    // NOTE: o valor dentro da struct sempre será do tipo byte, não precisa mapear
-    analogWrite(OUT_LED_R, color.R);
-    analogWrite(OUT_LED_G, color.G);
-    analogWrite(OUT_LED_B, color.B);
+void write_to_led(byte t_index) {
+  for(auto j = 0; j < VEC_LEN; j++)
+    analogWrite(RGB_PIN[j], T_RGB[t_index][j]); // Para escrever os valores contidos em [0, 255]
 }
 
-ButtonStatus get_button_status() {
-    bool up_current_status = digitalRead(IN_BUTTON_UP);
-    bool down_current_status = digitalRead(IN_BUTTON_DN);
-
-    if(up_current_status != btn_last_status.up_status) {
-        delay(5);
-        up_current_status = digitalRead(IN_BUTTON_UP);
-    }
-
-    if(down_current_status != btn_last_status.down_status) {
-        delay(5);
-        down_current_status = digitalRead(IN_BUTTON_DN);
-    }
-
-    ButtonStatus current_btn_status;
-    current_btn_status.up_status = up_current_status;
-    current_btn_status.down_status = down_current_status;
-
-    return current_btn_status;
-}
-
-
-// NOTE: número hardcodado no for loop
 void loop() {
-    for(auto i = 0; i < TABELA_LEN;) {
-        ButtonStatus actual_button_status = get_button_status();
+  Serial.print("T_LEN: ");
+  Serial.println(T_LEN);
 
-        if (btn_last_status.up_status == LOW && actual_button_status.up_status == HIGH) {
+  for(auto i = 0; (i < T_LEN);) {
+    statusButton(b_down);
+    statusButton(b_up);
+    // Para o botão que percorre a tabela no sentido cima->baixo
+    if(b_down.was_pressed) {
+      i--;
+      i < 0 ? i = T_LEN - 1 : i;
 
-            // NOTE: Não precisa limitar o caso em que i > tamanho da array pois essa condição 
-            // já está coberta pelo próprio laço for
-            ++i;
-
-            number_to_RGB(TABELA_RGB[i], actual_color);
-            write_color_to_led(actual_color);
-
-        } else if (btn_last_status.down_status == LOW && actual_button_status.down_status == HIGH) {
-
-            // NOTE: i == 0 é oaso correto a ser analisado, se não i será decrementado e seu valor 
-            // será jogado para -1
-            i == 0 ? i = TABELA_LEN - 1 : i--;
-
-            number_to_RGB(TABELA_RGB[i], actual_color);
-            write_color_to_led(actual_color);
-        }
-
-        btn_last_status = actual_button_status;
-
+      write_to_led(i);
     }
+
+    // Para o botão que percorre a tabela no sentido cima->baixo
+    if(b_up.was_pressed) {
+      i++;
+      i == T_LEN ? write_to_led(0) : write_to_led(i);
+   }
+
+    b_down.last_state = b_down.current_state;
+    b_up.last_state = b_up.current_state;
+  }
 }
