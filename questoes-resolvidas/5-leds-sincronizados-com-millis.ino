@@ -4,7 +4,8 @@ constexpr byte L_PIN[5] = {8, 9, 10, 11, 12};
 // frequência base, iremos multiplicá-la por uma constante para que seja modificada
 constexpr double FREQ_GAIN[] = {0.25, 0.5, 1.0, 1.5, 2.0};
 
-constexpr double FREQ_BASE{1.0/1000.0}; // frequência base, em ciclo por milisegundo
+// frequência base, em ciclo por milisegundo, usada para referência de piscamento
+constexpr double FREQ_BASE{1.0/1000.0};
 
 // Período que o LED pisca (acede e apaga) dada a frequência
 // O LED ficará aceso por L_PER/2 ms e apagado por L_PER/2 ms
@@ -35,7 +36,7 @@ bool dentro_do_ciclo(unsigned long t_atual, unsigned long t_max) {
    return (0 <= t_atual && t_atual <= t_max) ? true : false;
 }
 
-bool blink(byte led_index, unsigned long dt) {
+void blink(byte led_index, unsigned long dt) {
 
     // Tome como exemplo um período que tenha exatamente 1000ms e considere que
     // o LED deva piscar (ou seja, ligar e desligar) 1x. Esse if verifica se o
@@ -51,15 +52,6 @@ bool blink(byte led_index, unsigned long dt) {
         digitalWrite(L_PIN[led_index], LOW);
         L_L_STATUS[led_index] = LOW;
     }
-
-    // Ainda no exemplo anterior, se dt > 1000ms, não nos interessa mais ter
-    // valores acima disso, já que nosso LED está restringido ao intervalo de
-    // ação [0, 1000], ligado quando dt está em [0,500] e desligado quando dt
-    // está em [500, 1000], portanto podemos "resetar" o timer do LED para que
-    // dt volte para 0 novamente.
-    if(dt >= L_PER[led_index]) {
-        L_TIMER[led_index] = millis();
-    }
 }
 
 void setup() {
@@ -67,7 +59,7 @@ void setup() {
     // nesse contexto, talvez iniciar as arrays com 0 não seja necessário, mas é
     // bom para evitar algum bug obscuro de lógica.
     for(byte i = 0; i < 5; i++) {
-        pinMode(i, OUTPUT);
+        pinMode(L_PIN[i], OUTPUT);
         L_PER[i] = periodo(i);
         L_TIMER[i] = 0;
         L_L_STATUS[i] = false;
@@ -81,7 +73,13 @@ void loop() {
     for(byte i = 0; i < 5; i++) {
         if(dentro_do_ciclo(millis() - L_TIMER[i], L_PER[i])) {
             blink(i, millis() - L_TIMER[i]);
+        } else {
+          // Ainda no exemplo anterior, se dt > 1000ms, não nos interessa mais
+          // ter valores de dt acima disso, já que nosso LED está restringido ao
+          // intervalo de ação [0, 1000]: ligado quando dt está em [0,500] e
+          // desligado quando dt está em [500, 1000], portanto podemos "resetar"
+          // o timer do LED para que dt volte para 0 novamente.
+          L_TIMER[i] = millis();
         }
     }
-
 }
