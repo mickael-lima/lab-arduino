@@ -1,86 +1,95 @@
-constexpr byte SONAR_TRIGGER{7};
-constexpr byte SONAR_ECHO{8};
+/* Sensor de distância com indicativo visual por meio de 9 LEDs que se acendem em função da distância
+ * Os LEDs são divididos em 3 grupos: o primeiro se acenderá se a distância estiver em um intervalo de
+ * $[150, +\inf[$ centímetros, o segundo grupo se acenderá quando $d \in [100, 150]$, o terceiro grupo
+ * se acenderá quando $d \in [50, 100]$ e quando $d \in [0, 50]$, o terceiro grupo de LEDs ficará piscando.
+ * Será usado como sensor o sonar HC-SR04. NOTE: Testado com êxito em simulação.
+*/
 
-// NOTE: em centímetros por microssegundos. Em uma das etapas do cálculo de distância, será necessário dividir por 2, portanto
-// é interessante fazê-lo logo na constante para poupar processamento. A velocidade do som em cm/µs é 0.343
-constexpr float V_DO_SOM{0.01715};
+// Constante para cálculo da distância em função da velocidade do som. O sonar trabalha detectando a distância
+// de ida e de volta, portanto ele retorna a distância como 2d ao invés de d, é necessário já dividir por 2
+// Ainda, a velocidade aqui está em centímetros por milissegundos.
+constexpr double V_SOM{0.034029/2};
 
-constexpr byte LED[] = {9, 10, 11};
+constexpr byte S_ECHO{2};
+constexpr byte S_TRIG{3};
 
-// NOTE: O -1 servirá para computarmos o complemento dentro do for loop e, com isso, inverter a ordem dos LEDs que serão acesos 
-// sem modificar a lógica das funções já existentes
-constexpr byte LED_ARR_SIZE{sizeof(LED)/sizeof(byte) - 1};
+unsigned long l_per{0}; // para o último grupo de LEDs
+double d{0}; // armazena a distância que o sensor retorna
 
-// O Sonar age enviando um pulso de som e contabilizando o tempo que ele demora pra voltar até o sensor (semelhante a um morcego)
-// portanto precisa de duas portas: uma para emitir o som e outra para recebe-lo de volta
+byte LED[9];
+
 void setup() {
-  pinMode(SONAR_TRIGGER, OUTPUT); // O arduino envia informação através do Trigger, que vai fazer o speaker emitir o som
-  pinMode(SONAR_ECHO, INPUT); // O arduino recebe informação do Echo (onde a onda de som retorna)
+    pinMode(S_ECHO, INPUT);
+    pinMode(S_TRIG, OUTPUT);
 
-  for(auto PIN : LED)
-    pinMode(PIN, OUTPUT);
+    for(byte i = 0; i < 9; i++) {
+        LED[i] = i + 4; // considerando o pino do Sonar, que já está em uso
+        pinMode(LED[i], OUTPUT);
+    }
 }
 
-// É possível calcular a distância considerando a velocidade do som constante, o que permite a aplicação das fórmulas básicas do M.U
-// como a velocidade está em cm/microssegundos, essa função retornará a distância em centimetros.
-float distance() {
+// Função para obter a distância pelo sensor
+double distancia() {
 
-  // Prepara o trigger, inicializando-o com o valor LOW, isso garante que ele esteja pronto para funcionar
-  digitalWrite(SONAR_TRIGGER, LOW);
-  delayMicroseconds(2);
+    // Prepara o pino para ser iniciado
+    digitalWrite(S_TRIG, LOW);
+    delayMicroseconds(2);
 
-  // Ativa o trigger e faz com que ele emita o sinal ultrasônico por 10 microssegundos
-  digitalWrite(SONAR_TRIGGER, HIGH);
-  delayMicroseconds(10);
+    // Emite sinal HIGH por 10 microssegundos (datasheet)
+    digitalWrite(S_TRIG, HIGH);
+    delayMicroseconds(10);
+    digitalWrite(S_TRIG, LOW);
 
-  // Desativa o trigger após 10 microssegundos de execução, liberando espaço pro SONAR_ECHO trabalhar
-  digitalWrite(SONAR_TRIGGER, LOW);
-
-  // Quando SONAR_TRIGGER for pra LOW, vai ativar uma espécie de "timer" dentro do sensor que vai computar o tempo de IDA e VOLTA da
-  // onda de som, a função pulseIn() computa o tempo que SONAR_ECHO demora pra ir de LOW para HIGH.
-  //
-  // NOTE: pulseIn() retorna o tempo em microssegundos
-  auto tempo = pulseIn(SONAR_ECHO, HIGH);
-
-  // S = So + vt. Para esse exemplo usaremos float apenas para testes, mas para outras aplicações o int pode ser o suficiente
-  // Isso computará o tempo de IDA e VOLTA (x cm na IDA e x centimetros na volta), para achar x apenas é necessário dividir a
-  // distância (dada por V_DO_SOM * tempo) por 2. A operação de divisão fora executada dentro da constante no começo do arquivo
-  return (V_DO_SOM * tempo);
+    // Retorna quanto tempo leva para S_ECHO ir de LOW pra HIGH
+    // depois do pulso sonoro emitido anteriormente, esse é o
+    // tempo t necessário para calcular a distância. Como, em
+    // teoria, a velocidade do som é constante nesse contexto
+    // então x(t) = x_o + vt, onde x(t) está sendo mult. por 2
+    // x_o = 0, v = V_SOM e t = retorno de pulseIn(). A divisão
+    // por 2 já fora feita na constante, portanto não aparece.
+    return pulseIn(S_ECHO, HIGH) * V_SOM;
 }
 
-// Função para verificar se value está contido no intervalo fechado [a,b], considerando a < b
-// NOTE: tirar template depois e colocar tipos fixos
-template<typename T, typename U>
-bool in_interval(T value, U a, U b) {
-  return (value >= a && value <= b) ? true : false;
+// Por questões de simplificação, será usado o número binário puro para piscar o grupo de LED
+// Ex: para piscar os 3 primeiros grupos de LED, usa-se 0b111000000
+void write_to_led(unsigned int bin_code) {
+    for(byte i = 0; i < 9; i++)
+        digitalWrite(LED[8 - i], (bin_code >> i) & 0b1);
 }
 
-void write_to_led(byte number) {
-  for(auto i = 0; i <= LED_ARR_SIZE; i++)
-    digitalWrite(LED[i], (number >> (LED_ARR_SIZE - i)) & 0b1); // NOTE: Complemento aplicado aqui
+void blink_last_led_group() {
+    write_to_led(0b111111000);
+
+    if(millis() - l_per <= 500)
+        write_to_led(0b111111111);
+    else
+        write_to_led(0b111111000);
+
+    if(millis() - l_per > 1000)
+        l_per = millis();
+}
+
+bool in_interval(double x, double a, double b) {
+    return (x >= a && x < b) ? true : false;
 }
 
 void loop() {
-  auto actual_distance = distance();
+    double d = distancia();
 
-  // NOTE: caso a distância não precise ser em float, pode-se refatorar usando switch case
-  // Se a distância estiver entre 100 e 150 cm
-  if(in_interval(actual_distance, 100, 150))
-    write_to_led(0b100); // equivale a {1, 0 ,0}
+    if(in_interval(d, 150.00, 300.00))
+        write_to_led(0b111000000);
 
-  // Se a distância estiver entre 50 e 100 cm
-  else if(in_interval(actual_distance, 50, 100))
-    write_to_led(0b110); // equivale a {1, 1, 0}
+    else if(in_interval(d, 100.00, 150.00))
+        write_to_led(0b111111000);
 
-  // Se a distância estiver entre 50 e 100cm
-  else if(in_interval(actual_distance, 0, 50)) {
-    write_to_led(0b111); // equivale a {1, 1, 1}
-    delay(actual_distance * 20); // para implementar o efeito de luzes piscando proporcional a distância
+    else if(in_interval(d, 50.00, 100.00))
+        write_to_led(0b111111111);
 
-    write_to_led(0b110);
-    delay(actual_distance * 20);
-  }
+    else if(in_interval(d, 0.00, 50.00))
+        blink_last_led_group();
 
-  else
-    write_to_led(0b000);
+    // Condição visual que serve para indicar que o objeto está muito longe para se ter uma
+    // medição precisa.
+    else
+        write_to_led(0b101010101);
 }
